@@ -1,0 +1,86 @@
+<!doctype html><meta charset="utf-8"><title>Mary's AI: teach it your workflow</title>
+<style>body{font:15px/1.45 -apple-system,system-ui,sans-serif;max-width:1000px;margin:24px auto;padding:0 16px;color:#1d2330;background:#f6f7f9}
+h1{margin:0 0 4px}.sub{color:#667;margin-bottom:18px}.card{background:#fff;border-radius:10px;padding:16px 18px;margin:14px 0;box-shadow:0 1px 3px #0001;border-left:6px solid #c9ced8}
+label{display:block;font-weight:600;margin:12px 0 4px}input[type=text],textarea{width:100%;box-sizing:border-box;padding:7px 9px;border:1px solid #ccd;border-radius:6px;font:inherit}
+.hint{color:#667;font-size:13px;font-weight:400}.pdfs{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:14px}.pdfs label{display:inline;font-weight:400;margin:0}
+button{font:inherit;padding:8px 16px;border-radius:6px;border:1px solid #2e6bd9;background:#2e6bd9;color:#fff;cursor:pointer}button:disabled{opacity:.5}
+.step{border-left-color:#c9ced8}.step.run{border-left-color:#d99a00}.step.ok{border-left-color:#2e9d5b}.step.bad{border-left-color:#c0392b}
+.step h3{margin:0 0 6px;font-size:16px}.st{font-size:13px;color:#667;margin-left:8px;font-weight:400}.body{font-size:14px}.tag{display:inline-block;background:#eef1f6;border-radius:10px;padding:1px 8px;font-size:12px;color:#556}
+.goal{background:#eef6ff;border-radius:8px;padding:10px 14px;margin:10px 0;display:none}iframe{width:100%;height:720px;border:1px solid #ddd;border-radius:8px;background:#fff}ul{margin:6px 0}</style>
+<h1>Teach your AI your morning routine</h1>
+<div class="sub">Give us the tool you use and show us the workflow once. We run it, check every step, and hand you something to take with you.</div>
+<div class="goal" id="goalBox"></div>
+
+<form class="card" id="f">
+  <label>Your tool's URL</label><input type="text" id="url" value="https://demo.openemr.io/a/openemr">
+  <label>Show us your workflow <span class="hint">(a screen recording, and/or a Chrome Recorder JSON)</span></label>
+  <div>Screen recording: <input type="file" id="video" accept="video/*"></div>
+  <div style="margin-top:6px">Chrome Recorder JSON: <input type="file" id="rec" accept=".json,application/json"></div>
+  <label>Your goal <span class="hint">(optional)</span></label><textarea id="goal" rows="2" placeholder="e.g. Enter this morning's referral faxes and book their first visits"></textarea>
+  <label>Referral PDFs to process</label><div class="pdfs" id="pdfs"></div>
+  <p><button id="go" type="submit">Run it</button> <span class="hint" id="siteNote"></span></p>
+</form>
+
+<div id="steps"></div>
+
+<script>
+const API = location.origin;
+const q = new URLSearchParams(location.search);
+const SITE = q.get('site') || 'a';            // public default a; ?site=main for testing
+const SUFFIX = q.get('suffix') || '';         // testing only: tags last names so repeated runs don't collide
+const SAVED = ['Log in to OpenEMR', 'Register the patient (Patient > New/Search): name, DOB, sex, contact details', 'Book a New Patient appointment on the next weekday',
+  'Enter the insurance from the referral (Relationship = Self, carrier, member ID, group)', 'Attach the referral PDF to the patient\'s Documents (Medical Record)'];
+const pdfBox = document.getElementById('pdfs');
+for (let i = 1; i <= 10; i++) { const n = `referral-${String(i).padStart(2, '0')}.pdf`; pdfBox.insertAdjacentHTML('beforeend', `<label><input type="checkbox" value="${n}" ${i <= 3 ? 'checked' : ''}> ${n}</label>`); }
+if (SITE !== 'a' || SUFFIX) document.getElementById('siteNote').textContent = `test mode: site=${SITE}${SUFFIX ? ', suffix=' + SUFFIX : ''}`;
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
+const steps = [['understand', '1. Understand the workflow'], ['login', '2. Log in'], ['run', '3. Run it'], ['confirm', '4. Confirm'], ['take', '5. Take it with you']];
+document.getElementById('steps').innerHTML = steps.map(([k, t]) => `<div class="card step" id="s-${k}"><h3>${t}<span class="st">waiting</span></h3><div class="body"></div></div>`).join('');
+const set = (k, cls, st, html) => { const e = document.getElementById('s-' + k); e.className = 'card step ' + cls; e.querySelector('.st').textContent = st; if (html !== undefined) e.querySelector('.body').innerHTML = html; };
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+const j = async (u, o) => { const r = await fetch(API + u, o); let b = {}; try { b = await r.json(); } catch {} return { code: r.status, b }; };
+
+document.getElementById('f').onsubmit = async e => {
+  e.preventDefault(); document.getElementById('go').disabled = true;
+  const goal = document.getElementById('goal').value.trim();
+  const gb = document.getElementById('goalBox'); if (goal) { gb.style.display = 'block'; gb.innerHTML = `<b>Your goal:</b> ${esc(goal)}`; }
+  const pdfs = [...pdfBox.querySelectorAll('input:checked')].map(i => i.value);
+  const video = document.getElementById('video').files[0], rec = document.getElementById('rec').files[0];
+  // 1. Understand
+  set('understand', 'run', 'working…');
+  let wf = '';
+  if (rec) {
+    const r = await j('/workflow/from-recording', { method: 'POST', headers: { 'content-type': 'application/json' }, body: await rec.text() });
+    if (r.code === 200 && r.b.bullets) wf = `<span class="tag">from your recording: ${esc(rec.name)}</span><ul>${r.b.bullets.map(b => `<li>${esc(b)}</li>`).join('')}</ul>`;
+    else wf = `<p>Could not read the recording ${esc(rec.name)}: ${esc(r.b.error || 'HTTP ' + r.code)}</p>`;
+  }
+  if (video) wf += `<p>Video received: ${esc(video.name)}.</p>`;
+  if (!rec) wf += `<p>Workflow <span class="tag">from our saved workflow for this app</span></p><ul>${SAVED.map(b => `<li>${esc(b)}</li>`).join('')}</ul>`;
+  set('understand', 'ok', 'done', wf);
+  // 2. Log in
+  set('login', 'run', 'checking your login…');
+  let s = await j(`/status?site=${SITE}`);
+  if (s.b.status !== 'LOGGED_IN') {
+    set('login', 'run', 'a login window has opened; log in there', '<p>Log in with your own username and password in the window that just opened. We never see or store your password; only the session is kept.</p>');
+    const l = await j('/login', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ site: SITE }) });
+    if (l.code !== 200 || l.b.status !== 'LOGGED_IN') { set('login', 'bad', 'not logged in', `<p>${esc(l.b.error || 'HTTP ' + l.code)}. Click Run it again to retry.</p>`); document.getElementById('go').disabled = false; return; }
+    s = l;
+  }
+  set('login', 'ok', 'logged in', `<p>Logged in to ${esc(s.b.site_url || SITE)}.</p>`);
+  // 3. Run
+  set('run', 'run', 'starting…', `<p>Processing ${pdfs.length} referral(s): ${pdfs.map(esc).join(', ')}. Watch the browser window; each step is read back from OpenEMR after it is written.</p>`);
+  const body = { site: SITE, headed: true, async: true, pdfs }; if (SUFFIX) body.suffix = SUFFIX;
+  const st = await j('/intake', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
+  if (st.code !== 202 && st.code !== 200) { set('run', 'bad', 'could not start', `<p>${esc(st.b.error || 'HTTP ' + st.code)}</p>`); document.getElementById('go').disabled = false; return; }
+  const t0 = Date.now();
+  while (true) { await sleep(3000); const h = await j('/health'); set('run', 'run', `running… ${Math.round((Date.now() - t0) / 1000)}s`); if (!h.b.busy) break; }
+  const it = await j('/intake/latest');
+  const ok = it.b.intake_id === st.b.intake_id;
+  set('run', ok ? 'ok' : 'bad', ok ? it.b.summary : 'finished, but no result found',
+    ok ? `<ul>${(it.b.referrals || []).map(r => `<li><b>${esc(r.status)}</b> ${esc(r.file)}: ${esc((r.cli && r.cli.patient && r.cli.patient.last) || '')}${r.seconds ? ' · ' + r.seconds + 's' : ''}${r.reason ? ' · ' + esc(r.reason) : ''}</li>`).join('')}</ul>` : '');
+  // 4. Confirm
+  set('confirm', 'ok', 'review each referral', `<p><a href="/review/latest" target="_blank">Open the review page ↗</a>. Check each card and click Looks right or Something's wrong.</p><iframe src="/review/latest"></iframe>`);
+  // 5. Take it with you
+  set('take', 'ok', 'ready', `<p><a href="/skill"><button type="button">Download the skill (.zip)</button></a> Drop it into your AI so it can do this workflow for you.</p>`);
+};
+</script>

@@ -54,3 +54,9 @@ PASS GET /report/latest (after /intake) → 302 http://localhost:4710/runs/2026-
 - PASS click-through on MAIN (test/landing-clickthrough.ts, ?site=main&suffix=LP, 1 referral), 13:50:41→13:52:33. The "Chrome Recorder JSON" box was given our recorder's events.json (not a real Chrome Recorder export) → 3 bullets from from-recording. Login step: already LOGGED_IN. Run: "1/1 confirmed · 0 need Mary", referral-01 → HACKDEMO-Alvarez-LP, 97 s. The confirm step shows the review page in an iframe. Screenshots: test/out/landing-1-form … landing-6-take-it-with-you.png
 - PASS GET /skill → HTTP 200 application/zip (a PKZIP file, 4 entries under openemr-referral-intake/).
 - UNVERIFIED: the video-only path (the "from our saved workflow for this app" label) and a real Chrome Recorder export were not exercised.
+
+=== 13:55-13:58 landing page, video-only stage path on MAIN (?site=main&suffix=LV), no restart, no code change ===
+- /health was busy:null before the run (13:55:51) and busy:null after it (13:57:51); the PID stayed 29259.
+- Uploaded only submission/recordings/referral-demo-splitscreen-v1.mp4 (no JSON) and ticked only referral-06. Step 1 text: "Video received: referral-demo-splitscreen-v1.mp4." / "Workflow [from our saved workflow for this app]" followed by the 5 saved bullets.
+- Login step: already logged in (Main). Run: "1/1 confirmed · 0 need Mary", referral-06 → HACKDEMO-Escobedo-LV, 102.5 s. The review page showed in the confirm step.
+- Screenshots: test/out/landing-video-1-form … landing-video-6-take-it-with-you.png

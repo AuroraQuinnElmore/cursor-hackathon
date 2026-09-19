@@ -1,0 +1,154 @@
+{
+  "intake_id": "20260919_185559",
+  "site": "main",
+  "site_url": "https://demo.openemr.io/openemr",
+  "backend": "openemr-cli (session only; no password in any command)",
+  "headed": true,
+  "wall_seconds": 107,
+  "summary": "1/1 confirmed · 0 need Mary",
+  "review_url": "/intake/20260919_185559/review.html",
+  "referrals": [
+    {
+      "file": "referral-06.pdf",
+      "pdf_url": "/intake/20260919_185559/pdfs/referral-06.pdf",
+      "extracted": {
+        "file": "referral-06.pdf",
+        "template": "faxcover",
+        "faxed_look": false,
+        "clinic_name": "Cedar Hollow Community Clinic",
+        "clinic_address": "92 Makebelieve Ln, Bldg C, Round Rock, TX 78664",
+        "clinic_phone": "512-555-0160",
+        "clinic_fax": "512-555-0161",
+        "referring_provider": "Priya Ramanathan, FNP-C",
+        "referring_npi": "9345678012",
+        "referral_date": "2026-09-11",
+        "first_name": "Tomas",
+        "last_name": "HACKDEMO-Escobedo",
+        "dob": "1958-04-30",
+        "sex": "Male",
+        "phone": "512-555-0116",
+        "address_street": "9021 Prairie Wind Dr",
+        "address_city": "Cedar Park",
+        "address_state": "TX",
+        "address_zip": "78613",
+        "insurance_carrier": "Aekna",
+        "member_id": "AXX2559605",
+        "group_number": "GRP-80508",
+        "reason": "Shortness of breath on exertion; please evaluate for possible asthma or COPD.",
+        "specialty": "Pulmonology",
+        "urgency": "Urgent",
+        "display_dob": "04-30-1958",
+        "display_referral_date": "09/11/2026",
+        "display_sex": "Male",
+        "display_phone": "512-555-0116"
+      },
+      "flags": [
+        {
+          "type": "URGENT",
+          "reason": "Urgent referral: booked first, earliest slot"
+        }
+      ],
+      "triage_decision": "READY",
+      "seconds": 102.5,
+      "command": "openemr intake referrals/referral-06.pdf --site main --json --shots automation-server/intake/20260919_185559/shots/referral-06 --suffix LV",
+      "cli": {
+        "command": "intake <repo>/referrals/referral-06.pdf",
+        "site": "https://demo.openemr.io/openemr",
+        "ok": true,
+        "exit_code": 0,
+        "steps": [
+          {
+            "step": "patient create",
+            "status": "VERIFIED",
+            "detail": "pid 86; fresh load of demographics_full.php matches",
+            "readback": {
+              "first": "Tomas",
+              "last": "HACKDEMO-Escobedo-LV",
+              "dob": "1958-04-30",
+              "sex": "Male|Male",
+              "phone": "512-555-0116",
+              "street": "9021 PRAIRIE WIND DR",
+              "city": "CEDAR PARK",
+              "state": "Texas|TX",
+              "zip": "78613"
+            }
+          },
+          {
+            "step": "insurance add",
+            "status": "VERIFIED",
+            "detail": "fresh load of insurance_edit.php matches",
+            "readback": {
+              "carrier": "Aekna (4345 Don Road, , FL, 44433)",
+              "member_id": "AXX2559605",
+              "group": "GRP-80508",
+              "end_date": "",
+              "subscriber_last": "HACKDEMO-Escobedo-LV"
+            }
+          },
+          {
+            "step": "doc attach",
+            "status": "VERIFIED",
+            "detail": "fresh load of Documents list for pid 86 contains referral-06.pdf",
+            "readback": {
+              "document": "referral-06.pdf",
+              "category_id": "3"
+            }
+          },
+          {
+            "step": "appt create",
+            "status": "VERIFIED",
+            "detail": "fresh dashboard load shows \"New Patient Mon, 2026-09-21 10:00 Billy Smith (eid 132)\"",
+            "readback": {
+              "date": "2026-09-21",
+              "time": "10:00",
+              "category": "New Patient",
+              "provider": "Billy Smith",
+              "eid": "132"
+            }
+          }
+        ],
+        "extractor": "<repo>/extract/extract",
+        "patient": {
+          "first": "Tomas",
+          "last": "HACKDEMO-Escobedo-LV",
+          "dob": "1958-04-30"
+        },
+        "appointment": {
+          "date": "2026-09-21",
+          "time": "10:00",
+          "category": "New Patient"
+        },
+        "pid": "86",
+        "dialogs": [
+          "New Due Clinical Reminders\n\nMeasurement: Weight\nAssessment: Colon Cancer Screening\nAssessment: Prostate Cancer Screening\nTreatment: Influenza Vaccine\nTreatment: Pneumococcal Vaccine\nAssessment: Tobacco\n\nSee the Clinical Reminders widget for more details",
+          "Provider not available, use it anyway?"
+        ],
+        "seconds": 101.8
+      },
+      "final_shot": "/intake/20260919_185559/shots/referral-06/final-1789844266084.png",
+      "links": [
+        {
+          "key": "chart",
+          "label": "Patient chart",
+          "url": "https://demo.openemr.io/openemr/interface/patient_file/summary/demographics.php?set_pid=86"
+        },
+        {
+          "key": "insurance",
+          "label": "Insurance (shown on the patient chart)",
+          "url": "https://demo.openemr.io/openemr/interface/patient_file/summary/demographics.php?set_pid=86"
+        },
+        {
+          "key": "documents",
+          "label": "Documents: open the Medical Record folder",
+          "url": "https://demo.openemr.io/openemr/controller.php?document&list&patient_id=86"
+        },
+        {
+          "key": "appointment",
+          "label": "Appointment",
+          "url": "https://demo.openemr.io/openemr/interface/main/calendar/add_edit_event.php?eid=132"
+        }
+      ],
+      "status": "Confirmed ✓"
+    }
+  ]
+}
