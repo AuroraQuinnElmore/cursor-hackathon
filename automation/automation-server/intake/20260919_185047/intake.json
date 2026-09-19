@@ -1,0 +1,149 @@
+{
+  "intake_id": "20260919_185047",
+  "site": "main",
+  "site_url": "https://demo.openemr.io/openemr",
+  "backend": "openemr-cli (session only; no password in any command)",
+  "headed": true,
+  "wall_seconds": 102,
+  "summary": "1/1 confirmed · 0 need Mary",
+  "review_url": "/intake/20260919_185047/review.html",
+  "referrals": [
+    {
+      "file": "referral-01.pdf",
+      "pdf_url": "/intake/20260919_185047/pdfs/referral-01.pdf",
+      "extracted": {
+        "file": "referral-01.pdf",
+        "template": "letterhead",
+        "faxed_look": false,
+        "clinic_name": "Pecan Grove Family Medicine",
+        "clinic_address": "4410 Fictional Oak Blvd, Suite 200, Austin, TX 78745",
+        "clinic_phone": "512-555-0142",
+        "clinic_fax": "512-555-0143",
+        "referring_provider": "Dr. Marisol Quintero, MD",
+        "referring_npi": "9123456780",
+        "referral_date": "2026-09-01",
+        "first_name": "Rosa",
+        "last_name": "HACKDEMO-Alvarez",
+        "dob": "1985-03-14",
+        "sex": "Female",
+        "phone": "512-555-0111",
+        "address_street": "2210 Willowbend Dr",
+        "address_city": "Austin",
+        "address_state": "TX",
+        "address_zip": "78745",
+        "insurance_carrier": "Aekna",
+        "member_id": "AXX2650168",
+        "group_number": "GRP-56000",
+        "reason": "Evaluation of chronic right knee pain not improved with physical therapy.",
+        "specialty": "Orthopedics",
+        "urgency": "Routine",
+        "display_dob": "03/14/1985",
+        "display_referral_date": "September 1, 2026",
+        "display_sex": "Female",
+        "display_phone": "512-555-0111"
+      },
+      "flags": [],
+      "triage_decision": "READY",
+      "seconds": 97,
+      "command": "openemr intake referrals/referral-01.pdf --site main --json --shots automation-server/intake/20260919_185047/shots/referral-01 --suffix LP",
+      "cli": {
+        "command": "intake <repo>/referrals/referral-01.pdf",
+        "site": "https://demo.openemr.io/openemr",
+        "ok": true,
+        "exit_code": 0,
+        "steps": [
+          {
+            "step": "patient create",
+            "status": "VERIFIED",
+            "detail": "pid 85; fresh load of demographics_full.php matches",
+            "readback": {
+              "first": "Rosa",
+              "last": "HACKDEMO-Alvarez-LP",
+              "dob": "1985-03-14",
+              "sex": "Female|Female",
+              "phone": "512-555-0111",
+              "street": "2210 WILLOWBEND DR",
+              "city": "AUSTIN",
+              "state": "Texas|TX",
+              "zip": "78745"
+            }
+          },
+          {
+            "step": "insurance add",
+            "status": "VERIFIED",
+            "detail": "fresh load of insurance_edit.php matches",
+            "readback": {
+              "carrier": "Aekna (4345 Don Road, , FL, 44433)",
+              "member_id": "AXX2650168",
+              "group": "GRP-56000",
+              "end_date": "",
+              "subscriber_last": "HACKDEMO-Alvarez-LP"
+            }
+          },
+          {
+            "step": "doc attach",
+            "status": "VERIFIED",
+            "detail": "fresh load of Documents list for pid 85 contains referral-01.pdf",
+            "readback": {
+              "document": "referral-01.pdf",
+              "category_id": "3"
+            }
+          },
+          {
+            "step": "appt create",
+            "status": "VERIFIED",
+            "detail": "fresh dashboard load shows \"New Patient Mon, 2026-09-21 10:00 Billy Smith (eid 130)\"",
+            "readback": {
+              "date": "2026-09-21",
+              "time": "10:00",
+              "category": "New Patient",
+              "provider": "Billy Smith",
+              "eid": "130"
+            }
+          }
+        ],
+        "extractor": "<repo>/extract/extract",
+        "patient": {
+          "first": "Rosa",
+          "last": "HACKDEMO-Alvarez-LP",
+          "dob": "1985-03-14"
+        },
+        "appointment": {
+          "date": "2026-09-21",
+          "time": "10:00",
+          "category": "New Patient"
+        },
+        "pid": "85",
+        "dialogs": [
+          "New Due Clinical Reminders\n\nMeasurement: Weight\nMeasurement: Mammogram\nExamination: Pap Smear\nAssessment: Tobacco\n\nSee the Clinical Reminders widget for more details",
+          "Provider not available, use it anyway?"
+        ],
+        "seconds": 96.3
+      },
+      "final_shot": "/intake/20260919_185047/shots/referral-01/final-1789843949186.png",
+      "links": [
+        {
+          "key": "chart",
+          "label": "Patient chart",
+          "url": "https://demo.openemr.io/openemr/interface/patient_file/summary/demographics.php?set_pid=85"
+        },
+        {
+          "key": "insurance",
+          "label": "Insurance (shown on the patient chart)",
+          "url": "https://demo.openemr.io/openemr/interface/patient_file/summary/demographics.php?set_pid=85"
+        },
+        {
+          "key": "documents",
+          "label": "Documents: open the Medical Record folder",
+          "url": "https://demo.openemr.io/openemr/controller.php?document&list&patient_id=85"
+        },
+        {
+          "key": "appointment",
+          "label": "Appointment",
+          "url": "https://demo.openemr.io/openemr/interface/main/calendar/add_edit_event.php?eid=130"
+        }
+      ],
+      "status": "Confirmed ✓"
+    }
+  ]
+}
