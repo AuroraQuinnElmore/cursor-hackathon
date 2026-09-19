@@ -1,0 +1,33 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+# Python 3.13 skips setuptools' __editable__.*.pth files (treated as hidden).
+# Install with: pip install -e . --config-settings editable_mode=compat
+
+[project]
+name = "workflow-compiler"
+version = "0.1.0"
+description = "Turn a screen recording into structured workflows for agent tools"
+requires-python = ">=3.11"
+dependencies = [
+  "google-genai>=1.0",
+  "pydantic>=2.7",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8"]
+
+[project.scripts]
+compile-workflow = "workflow_compiler.cli:main"
+
+[tool.setuptools.package-dir]
+"" = "backend"
+
+[tool.setuptools.packages.find]
+where = ["backend"]
+include = ["workflow_compiler*"]
+
+[tool.pytest.ini_options]
+testpaths = ["backend/tests"]
+pythonpath = ["backend"]
