@@ -10,6 +10,15 @@ def test_help_exits_zero() -> None:
         raise AssertionError("argparse help should SystemExit 0")
 
 
+def test_help_mentions_map_apis(capsys) -> None:
+    try:
+        main(["--help"])
+    except SystemExit as exc:
+        assert exc.code == 0
+    out = capsys.readouterr().out
+    assert "map-apis" in out
+
+
 def test_schema_prints_json(capsys) -> None:
     code = main(["schema"])
     assert code == 0

@@ -12,68 +12,34 @@ from google.genai import types
 
 from workflow_compiler.env import gemini_api_key, gemini_model
 from workflow_compiler.ir import WorkflowExtraction
+from workflow_compiler.schema_util import json_schema_for_gemini as inline_json_schema
 
 EXTRACT_PROMPT = """You are extracting reusable software workflows from a screen recording.
 
-The recording shows a person using an application (often Invoice Ninja or similar SaaS).
+The recording shows a person using an application (often OpenEMR or similar clinical software).
 Your job is NOT to narrate the video. Your job is to identify each distinct JOB the person
 completed, and describe that job as structured workflow JSON.
 
 A workflow is one coherent goal an agent could later perform as a single tool, for example:
-- enable inventory tracking and set a product stock threshold
-- create an invoice for a client using a product
-- send a reminder about an overdue invoice
+- search a patient and schedule an appointment
+- register a new patient and open an encounter
+- document a visit with SOAP notes, vitals, and a prescription
 
 Rules:
 - Split into multiple workflows when the user clearly starts a different goal.
 - Merge tiny UI clicks that serve one goal into one workflow with several steps.
-- steps.action must be snake_case verbs (search_client, create_invoice, update_product_stock).
-- inputs_observed must be snake_case names an API tool could take (client_name, product_key, quantity).
-- Mark side_effect=true on steps that send email, take payment, delete data, or otherwise have irreversible effects.
+- steps.action must be snake_case verbs (search_patient, create_appointment, create_encounter, record_vitals).
+- inputs_observed must be snake_case names an API tool could take (patient_name, appointment_date, drug_name).
+- Mark side_effect=true on steps that send email, prescribe, take payment, delete data, or otherwise have irreversible effects.
 - Use notes for timestamps (mm:ss) and important UI labels.
-- Ignore idle mouse movement, login chrome, and unrelated browsing unless it is the outcome of the workflow (e.g. a notification email).
+- Ignore idle mouse movement, login chrome, and unrelated browsing unless it is the outcome of the workflow.
 - If the same job is demonstrated twice with different example data, emit ONE workflow and put the varying values in inputs_observed.
 - Return only the structured object. Do not include markdown.
 """
 
 
 def json_schema_for_gemini() -> dict[str, Any]:
-    """Inline Pydantic $defs so Gemini structured output does not go through AFC/tools."""
-    schema = WorkflowExtraction.model_json_schema()
-    defs = schema.pop("$defs", {}) or {}
-
-    def resolve(node: Any) -> Any:
-        if isinstance(node, dict):
-            if "$ref" in node:
-                name = str(node["$ref"]).rsplit("/", 1)[-1]
-                if name not in defs:
-                    raise KeyError(f"Unknown schema $ref: {node['$ref']}")
-                return resolve(defs[name])
-            out: dict[str, Any] = {}
-            for key, value in node.items():
-                if key in {"title", "default"}:
-                    continue
-                out[key] = resolve(value)
-            if "anyOf" in out:
-                variants = out["anyOf"]
-                non_null = [
-                    item
-                    for item in variants
-                    if not (isinstance(item, dict) and item.get("type") == "null")
-                ]
-                if len(non_null) == 1 and len(non_null) != len(variants):
-                    merged = dict(non_null[0])
-                    merged["nullable"] = True
-                    for key, value in out.items():
-                        if key != "anyOf":
-                            merged[key] = value
-                    return merged
-            return out
-        if isinstance(node, list):
-            return [resolve(item) for item in node]
-        return node
-
-    return resolve(schema)
+    return inline_json_schema(WorkflowExtraction)
 
 
 def _generation_config(timeout_ms: int) -> types.GenerateContentConfig:

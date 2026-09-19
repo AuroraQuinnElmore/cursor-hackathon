@@ -8,17 +8,17 @@ class WorkflowStep(BaseModel):
 
     action: str = Field(
         description=(
-            "Snake_case verb for the action, e.g. search_client, "
-            "update_product_stock, create_invoice, enable_inventory_tracking."
+            "Snake_case verb for the action, e.g. search_patient, "
+            "create_appointment, create_encounter, record_vitals."
         )
     )
     input: str | None = Field(
         default=None,
-        description="Name of an observed input this step consumes, e.g. client_name.",
+        description="Name of an observed input this step consumes, e.g. patient_name.",
     )
     object: str | None = Field(
         default=None,
-        description="Entity being acted on, e.g. client, product, invoice, company.",
+        description="Entity being acted on, e.g. patient, encounter, appointment, prescription.",
     )
     filter: str | None = Field(
         default=None,
@@ -79,3 +79,49 @@ class WorkflowExtraction(BaseModel):
     workflows: list[Workflow] = Field(
         description="Distinct jobs demonstrated in the recording. Split when the user starts a different goal."
     )
+
+
+class ApiBinding(BaseModel):
+    """One OpenAPI operation that exists in the spec. Phase 3 will call these in order."""
+
+    method: str = Field(description="HTTP method, e.g. GET, POST, PUT, DELETE.")
+    path: str = Field(
+        description="OpenAPI path template exactly as in the spec, e.g. /api/patient/{pid}/appointment."
+    )
+    purpose: str = Field(description="Why this call is needed for the workflow.")
+    maps_from: list[str] = Field(
+        default_factory=list,
+        description="Workflow step actions this call covers, e.g. search_patient, create_appointment.",
+    )
+    params: dict[str, str] = Field(
+        default_factory=dict,
+        description="Map of workflow input names to OpenAPI parameter or body field names.",
+    )
+
+
+class UnmappedStep(BaseModel):
+    """A human step with no matching operation in the spec. Do not invent a path for it."""
+
+    action: str
+    reason: str = Field(
+        description="Why it cannot be grounded, e.g. UI-only, or no fee-sheet endpoint in spec."
+    )
+
+
+class WorkflowPlan(BaseModel):
+    """One workflow plus the spec operations an agent would run."""
+
+    workflow_name: str
+    goal: str
+    inputs_observed: list[str] = Field(default_factory=list)
+    apis: list[ApiBinding] = Field(default_factory=list)
+    unmapped: list[UnmappedStep] = Field(default_factory=list)
+
+
+class ApiMappingResult(BaseModel):
+    """Phase 2 output: workflows grounded to a real OpenAPI spec."""
+
+    spec_title: str
+    spec_version: str
+    spec_path: str
+    workflows: list[WorkflowPlan]

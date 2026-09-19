@@ -7,14 +7,23 @@ from pathlib import Path
 
 from workflow_compiler.env import gemini_model, load_env_files
 from workflow_compiler.gemini_video import extract_workflows_from_video, extraction_to_dict
-from workflow_compiler.ir import WorkflowExtraction
+from workflow_compiler.ir import ApiMappingResult, WorkflowExtraction
+from workflow_compiler.map_apis import (
+    load_workflows,
+    map_workflows_to_apis,
+    mapping_to_dict,
+    validate_mapping,
+)
+from workflow_compiler.openapi import UngroundedApiError, load_openapi
+
+REPO_ROOT = Path(__file__).resolve().parents[2]
 
 
 def main(argv: list[str] | None = None) -> int:
     load_env_files()
     parser = argparse.ArgumentParser(
         prog="compile-workflow",
-        description="Phase 1: turn screen recordings into structured workflows.",
+        description="Compile screen recordings into grounded API plans for agent tools.",
     )
     sub = parser.add_subparsers(dest="command", required=True)
 
@@ -45,6 +54,28 @@ def main(argv: list[str] | None = None) -> int:
         help="Print the workflow JSON schema and exit (does not call Gemini).",
     )
 
+    map_apis = sub.add_parser(
+        "map-apis",
+        help="Ground workflows against an OpenAPI spec. Invented paths fail.",
+    )
+    map_apis.add_argument("--workflows", help="Phase 1 workflows JSON.")
+    map_apis.add_argument(
+        "--plan",
+        help="Existing plans JSON to validate against the spec (does not call OpenAI).",
+    )
+    map_apis.add_argument("--spec", required=True, help="OpenAPI YAML or JSON file.")
+    map_apis.add_argument("--out", help="Write grounded plans JSON here.")
+    map_apis.add_argument(
+        "--model",
+        default=None,
+        help="OpenAI model id. Defaults to OPENAI_MODEL or gpt-4o.",
+    )
+    map_apis.add_argument(
+        "--include-fhir",
+        action="store_true",
+        help="Include /fhir operations in the mapping catalog (default: standard /api only).",
+    )
+
     schema = sub.add_parser("schema", help="Print the workflow JSON schema.")
     schema.set_defaults(command="schema")
 
@@ -58,6 +89,13 @@ def main(argv: list[str] | None = None) -> int:
         try:
             return _cmd_from_video(args)
         except (RuntimeError, FileNotFoundError, TimeoutError) as exc:
+            print(exc, file=sys.stderr)
+            return 1
+
+    if args.command == "map-apis":
+        try:
+            return _cmd_map_apis(args)
+        except (RuntimeError, FileNotFoundError, TimeoutError, UngroundedApiError) as exc:
             print(exc, file=sys.stderr)
             return 1
 
@@ -99,6 +137,62 @@ def _cmd_from_video(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_map_apis(args: argparse.Namespace) -> int:
+    spec_path = _existing_file(args.spec, "OpenAPI spec")
+    spec = load_openapi(spec_path)
+    if args.plan:
+        plan_path = _existing_file(args.plan, "plan JSON")
+        raw = json.loads(plan_path.read_text(encoding="utf-8"))
+        mapping = validate_mapping(
+            ApiMappingResult.model_validate(raw), spec, spec_path=spec_path
+        )
+    elif args.workflows:
+        workflow_path = _existing_file(args.workflows, "workflows JSON")
+        workflows = load_workflows(workflow_path)
+        mapping = map_workflows_to_apis(
+            workflows,
+            spec_path,
+            model=args.model,
+            include_fhir=args.include_fhir,
+        )
+        mapping = validate_mapping(mapping, spec, spec_path=spec_path)
+    else:
+        print("map-apis requires --workflows or --plan.", file=sys.stderr)
+        return 2
+    payload = mapping_to_dict(mapping)
+    if args.out:
+        dest = _output_path(args.out)
+        _write_json(dest, payload)
+        _summarize_plans(payload, dest)
+    else:
+        print(json.dumps(payload, indent=2))
+        _summarize_plans(payload, Path("-"))
+    return 0
+
+
+def _existing_file(path: str, label: str) -> Path:
+    raw = Path(path).expanduser()
+    candidates = [raw] if raw.is_absolute() else [Path.cwd() / raw, REPO_ROOT / raw]
+    for candidate in candidates:
+        if candidate.is_file():
+            return candidate.resolve()
+    looked = "; ".join(str(item.resolve()) for item in candidates)
+    raise FileNotFoundError(f"No such {label}: {path} (looked in {looked})")
+
+
+def _output_path(path: str) -> Path:
+    raw = Path(path).expanduser()
+    if raw.is_absolute():
+        return raw
+    cwd_dest = Path.cwd() / raw
+    if cwd_dest.parent.is_dir():
+        return cwd_dest
+    repo_dest = REPO_ROOT / raw
+    if repo_dest.parent.is_dir():
+        return repo_dest
+    return cwd_dest
+
+
 def _run_one(video: str, model: str) -> dict:
     print(f"Extracting workflows from {video} with {model}...", file=sys.stderr)
     extraction = extract_workflows_from_video(video, model=model)
@@ -124,6 +218,27 @@ def _summarize(payload: dict, dest: Path) -> None:
         name = item.get("workflow_name", "(unnamed)")
         steps = len(item.get("steps") or [])
         print(f"  - {name} [{steps} steps]", file=sys.stderr)
+
+
+def _summarize_plans(payload: dict, dest: Path) -> None:
+    workflows = payload.get("workflows") or []
+    target = dest if str(dest) != "-" else "stdout"
+    print(f"Wrote {target} ({len(workflows)} plan(s))", file=sys.stderr)
+    for item in workflows:
+        name = item.get("workflow_name", "(unnamed)")
+        apis = item.get("apis") or []
+        unmapped = item.get("unmapped") or []
+        print(
+            f"  - {name} [{len(apis)} api call(s), {len(unmapped)} unmapped]",
+            file=sys.stderr,
+        )
+        for call in apis:
+            print(f"      {call.get('method')} {call.get('path')}", file=sys.stderr)
+        for skipped in unmapped:
+            print(
+                f"      unmapped {skipped.get('action')}: {skipped.get('reason')}",
+                file=sys.stderr,
+            )
 
 
 if __name__ == "__main__":

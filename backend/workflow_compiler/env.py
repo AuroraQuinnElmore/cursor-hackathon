@@ -47,3 +47,19 @@ def gemini_api_key() -> str:
 def gemini_model() -> str:
     load_env_files()
     return os.environ.get("GEMINI_MODEL", "gemini-2.5-flash").strip() or "gemini-2.5-flash"
+
+
+def openai_api_key() -> str:
+    load_env_files()
+    value = os.environ.get("OPENAI_API_KEY", "").strip()
+    if value:
+        return value
+    raise RuntimeError(
+        "Missing OpenAI API key. Copy .env.example to .env and set OPENAI_API_KEY, "
+        "or export OPENAI_API_KEY in your shell."
+    )
+
+
+def openai_model() -> str:
+    load_env_files()
+    return os.environ.get("OPENAI_MODEL", "gpt-4o").strip() or "gpt-4o"
