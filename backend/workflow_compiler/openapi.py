@@ -16,6 +16,7 @@ class Operation:
     description: str
     tags: tuple[str, ...]
     parameters: tuple[str, ...]
+    required: tuple[str, ...] = ()
 
     @property
     def key(self) -> tuple[str, str]:
@@ -57,12 +58,14 @@ def list_operations(spec: dict[str, Any], *, include_fhir: bool = False) -> list
                 or f"{method.upper()} {path}"
             )
             params = _param_names(op)
+            required = _required_names(op)
             operation = Operation(
                 method=method.upper(),
                 path=path,
                 description=description.split("\n", 1)[0][:240],
                 tags=tags,
                 parameters=params,
+                required=required,
             )
             if operation.is_fhir and not include_fhir:
                 continue
@@ -144,6 +147,28 @@ def _param_names(op: dict[str, Any]) -> tuple[str, ...]:
             if isinstance(required, list):
                 names.extend(str(item) for item in required if item not in names)
     # de-dupe, keep order
+    seen: set[str] = set()
+    ordered: list[str] = []
+    for name in names:
+        if name not in seen:
+            seen.add(name)
+            ordered.append(name)
+    return tuple(ordered)
+
+
+def _required_names(op: dict[str, Any]) -> tuple[str, ...]:
+    names: list[str] = []
+    for param in op.get("parameters") or []:
+        if isinstance(param, dict) and param.get("required") and param.get("name"):
+            names.append(str(param["name"]))
+    body = op.get("requestBody")
+    if isinstance(body, dict):
+        content = body.get("content") or {}
+        for media in content.values():
+            schema = (media or {}).get("schema") or {}
+            required = schema.get("required") or []
+            if isinstance(required, list):
+                names.extend(str(item) for item in required)
     seen: set[str] = set()
     ordered: list[str] = []
     for name in names:

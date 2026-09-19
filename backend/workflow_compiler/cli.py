@@ -5,6 +5,7 @@ import json
 import sys
 from pathlib import Path
 
+from workflow_compiler.emit_skills import emit_skills, load_plans
 from workflow_compiler.env import gemini_model, load_env_files
 from workflow_compiler.gemini_video import extract_workflows_from_video, extraction_to_dict
 from workflow_compiler.ir import ApiMappingResult, WorkflowExtraction
@@ -76,6 +77,21 @@ def main(argv: list[str] | None = None) -> int:
         help="Include /fhir operations in the mapping catalog (default: standard /api only).",
     )
 
+    emit_skills_cmd = sub.add_parser(
+        "emit-skills",
+        help="Write one Cursor SKILL.md per workflow in a grounded plan.",
+    )
+    emit_skills_cmd.add_argument("--plan", required=True, help="Phase 2 plans JSON.")
+    emit_skills_cmd.add_argument(
+        "--out",
+        default=None,
+        help="Directory for skill-name/SKILL.md. Defaults to <repo>/.cursor/skills.",
+    )
+    emit_skills_cmd.add_argument(
+        "--spec",
+        help="OpenAPI spec used to annotate required fields. Defaults to spec_path in the plan.",
+    )
+
     schema = sub.add_parser("schema", help="Print the workflow JSON schema.")
     schema.set_defaults(command="schema")
 
@@ -96,6 +112,13 @@ def main(argv: list[str] | None = None) -> int:
         try:
             return _cmd_map_apis(args)
         except (RuntimeError, FileNotFoundError, TimeoutError, UngroundedApiError) as exc:
+            print(exc, file=sys.stderr)
+            return 1
+
+    if args.command == "emit-skills":
+        try:
+            return _cmd_emit_skills(args)
+        except (RuntimeError, FileNotFoundError, UngroundedApiError) as exc:
             print(exc, file=sys.stderr)
             return 1
 
@@ -168,6 +191,35 @@ def _cmd_map_apis(args: argparse.Namespace) -> int:
         print(json.dumps(payload, indent=2))
         _summarize_plans(payload, Path("-"))
     return 0
+
+
+def _cmd_emit_skills(args: argparse.Namespace) -> int:
+    plan_path = _existing_file(args.plan, "plan JSON")
+    mapping = load_plans(plan_path)
+    spec_arg = args.spec or mapping.spec_path
+    spec = None
+    if spec_arg:
+        try:
+            spec = load_openapi(_existing_file(spec_arg, "OpenAPI spec"))
+        except FileNotFoundError:
+            if args.spec:
+                raise
+            spec = None
+    out_dir = _skill_out_dir(args.out)
+    written = emit_skills(mapping, out_dir, spec=spec)
+    print(f"Wrote {len(written)} skill(s) under {out_dir}", file=sys.stderr)
+    for dest in written:
+        print(f"  - {dest.parent.name}/SKILL.md", file=sys.stderr)
+    return 0
+
+
+def _skill_out_dir(path: str | None) -> Path:
+    if not path:
+        return REPO_ROOT / ".cursor" / "skills"
+    raw = Path(path).expanduser()
+    if raw.is_absolute():
+        return raw
+    return (REPO_ROOT / raw).resolve()
 
 
 def _existing_file(path: str, label: str) -> Path:

@@ -17,6 +17,7 @@ def test_help_mentions_map_apis(capsys) -> None:
         assert exc.code == 0
     out = capsys.readouterr().out
     assert "map-apis" in out
+    assert "emit-skills" in out
 
 
 def test_schema_prints_json(capsys) -> None:
