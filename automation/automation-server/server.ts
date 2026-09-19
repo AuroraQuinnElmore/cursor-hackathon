@@ -148,6 +148,18 @@ const server = http.createServer(async (req, res) => {
       send(res, 200, { run_id: after, exit_code: r.code, report_url: `/runs/${after}/report.html`, totals: report.totals, report });
     });
 
+    // Upload one input document (raw bytes). Saved to automation-server/inputs/<safe name>.pdf; /intake uses it via {dir:"inputs"}.
+    if (p === '/inputs' && req.method === 'POST') {
+      const raw = (u.searchParams.get('name') || '').replace(/[^A-Za-z0-9._-]/g, '_').slice(0, 80);
+      if (!/\.pdf$/i.test(raw)) return send(res, 400, { error: 'name must end in .pdf' });
+      const chunks: Buffer[] = []; let n = 0;
+      for await (const c of req) { n += (c as Buffer).length; if (n > 20 * 1024 * 1024) return send(res, 413, { error: 'file too large (20 MB max)' }); chunks.push(c as Buffer); }
+      const buf = Buffer.concat(chunks);
+      if (buf.subarray(0, 5).toString() !== '%PDF-') return send(res, 400, { error: 'not a PDF' });
+      const dir = path.join(HERE, 'inputs'); fs.mkdirSync(dir, { recursive: true });
+      fs.writeFileSync(path.join(dir, raw), buf);
+      return send(res, 200, { ok: true, name: raw, bytes: buf.length, dir: 'inputs' });
+    }
     if (p === '/intake' && req.method === 'POST') return exclusive('intake', res, async () => {
       // One-button batch via the openemr CLI (session only; NO password in any command). Per PDF:
       //   openemr intake <pdf> --site <s> [--suffix TAG] --json   (extract → patient → insurance → doc → appt, each read back)
@@ -156,7 +168,7 @@ const server = http.createServer(async (req, res) => {
       const headed = !!b.headed;
       const id = stamp(), work = path.join(HERE, 'intake', id); fs.mkdirSync(path.join(work, 'pdfs'), { recursive: true });
       const log = (...m: any[]) => console.log(`[intake ${new Date().toLocaleTimeString('en-US', { hour12: false })}]`, ...m);
-      const dir = b.dir || path.join(ROOT, 'referrals');
+      const dir = b.dir === 'inputs' ? path.join(HERE, 'inputs') : (b.dir || path.join(ROOT, 'referrals'));
       let pdfs: string[] = Array.isArray(b.pdfs) && b.pdfs.length ? b.pdfs.map((x: string) => path.resolve(dir, x))
         : fs.readdirSync(dir).filter(f => f.toLowerCase().endsWith('.pdf')).sort().map(f => path.join(dir, f));
       if (!pdfs.length) return send(res, 400, { error: 'no PDFs found', dir });

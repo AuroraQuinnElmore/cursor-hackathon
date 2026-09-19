@@ -44,6 +44,7 @@ input[type=file]::file-selector-button:hover{border-color:var(--color-ink-2)}
 .pdfs label:hover{border-color:var(--color-rule-2)}
 .pdfs label:has(input:checked){background:var(--color-accent-wash);border-color:var(--color-accent);color:var(--color-ink)}
 .pdfs input{accent-color:var(--color-accent);margin:0}
+#preloaded{grid-template-columns:minmax(0,1fr);margin:var(--space-xs) 0} #preloaded label{white-space:normal}
 .samples summary{cursor:pointer;font-size:var(--text-sm);color:var(--color-ink);margin-bottom:var(--space-xs)} .samples summary:focus-visible{outline:2px solid var(--color-focus);outline-offset:2px}
 .actions{display:flex;align-items:center;gap:var(--space-md);flex-wrap:wrap;margin-top:var(--space-lg)}
 button,.btn{font:600 var(--text-base)/1 var(--font-body);padding:12px 20px;border-radius:var(--radius-sm);border:1px solid var(--color-accent);background:var(--color-accent);color:oklch(100% 0 0);cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;white-space:nowrap;transition:background var(--dur-fast) var(--ease-out),transform var(--dur-fast) var(--ease-out)}
@@ -79,13 +80,15 @@ iframe{width:100%;height:min(760px,80vh);border:1px solid var(--color-rule);bord
 <div class="goal" id="goalBox"></div>
 <main class="bench">
 <form class="card" id="f">
-  <label for="url">Your tool's URL</label><input type="text" id="url" value="https://demo.openemr.io/a/openemr">
+  <label for="url">Your tool's URL</label><input type="text" id="url" value="" placeholder="https://your-tool.example.com">
   <label>Show us your workflow <span class="hint">(a screen recording, and/or a Chrome Recorder JSON)</span></label>
   <div class="file"><span>Screen recording</span><input type="file" id="video" accept="video/*" aria-label="Screen recording"></div>
   <div class="file"><span>Chrome Recorder</span><input type="file" id="rec" accept=".json,application/json" aria-label="Chrome Recorder JSON"></div>
   <label for="goal">Your goal <span class="hint">(optional)</span></label><textarea id="goal" rows="2" placeholder="e.g. Every morning I enter new patients from the fax pile and book their first visit"></textarea>
   <label>What should it work through? <span class="hint">(the documents or records your workflow starts from)</span></label>
-  <details class="samples" open><summary><span id="sampleLabel">Sample inputs for this app</span> <span class="hint">· pick which to run</span></summary><div class="pdfs" id="pdfs"></div></details>
+  <div class="file"><span>Upload documents</span><input type="file" id="docs" accept="application/pdf,.pdf" multiple aria-label="Upload documents (PDF)"></div>
+  <div id="preloaded" class="pdfs" hidden></div>
+  <details class="samples" id="samplesBox"><summary><span id="sampleLabel">Or use sample inputs for this app</span> <span class="hint">· optional</span></summary><div class="pdfs" id="pdfs"></div></details>
   <div class="actions"><button id="go" type="submit">Run it</button><span class="hint" id="siteNote"></span></div>
 </form>
 <section id="steps" aria-live="polite"></section>
@@ -100,13 +103,19 @@ const SUFFIX = q.get('suffix') || '';         // testing only: tags last names s
 const SAVED = ['Log in to OpenEMR', 'Register the patient (Patient > New/Search): name, DOB, sex, contact details', 'Book a New Patient appointment on the next weekday',
   'Enter the insurance from the referral (Relationship = Self, carrier, member ID, group)', 'Attach the referral PDF to the patient\'s Documents (Medical Record)'];
 const pdfBox = document.getElementById('pdfs');
-for (let i = 1; i <= 10; i++) { const n = `referral-${String(i).padStart(2, '0')}.pdf`; pdfBox.insertAdjacentHTML('beforeend', `<label title="${n}"><input type="checkbox" value="${n}" ${i <= 3 ? 'checked' : ''}> ${n}</label>`); }
-const urlIn = document.getElementById('url'); const showHost = () => { let h = ''; try { h = new URL(urlIn.value).hostname; } catch {} document.getElementById('sampleLabel').textContent = h ? `Sample inputs for ${h} (referral faxes)` : 'Sample inputs for this app'; }; urlIn.addEventListener('input', showHost); showHost();
+for (let i = 1; i <= 10; i++) { const n = `referral-${String(i).padStart(2, '0')}.pdf`; pdfBox.insertAdjacentHTML('beforeend', `<label title="${n}"><input type="checkbox" value="${n}"> ${n}</label>`); }
+const urlIn = document.getElementById('url'); const showHost = () => { let h = ''; try { h = new URL(urlIn.value).hostname; } catch {} document.getElementById('sampleLabel').textContent = h ? `Or use sample inputs for ${h} (referral faxes)` : 'Or use sample inputs for this app'; }; urlIn.addEventListener('input', showHost);
+// ?demo=1 → a pre-filled demo: the demo copy URL and one document already attached
+const DEMO = q.get('demo') === '1'; const PRELOAD = DEMO ? (q.get('doc') || 'referral-06.pdf').replace(/[^A-Za-z0-9._-]/g, '') : '';
+if (DEMO) { urlIn.value = 'https://demo.openemr.io/a/openemr'; const pl = document.getElementById('preloaded'); pl.hidden = false;
+  pl.innerHTML = `<label style="cursor:default"><input type="checkbox" checked disabled> ${PRELOAD} <span class="hint">· attached</span></label>`; }
+showHost();
 if (SITE !== 'a' || SUFFIX) document.getElementById('siteNote').textContent = `test mode: site=${SITE}${SUFFIX ? ', suffix=' + SUFFIX : ''}`;
 const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
 const steps = [['understand', 'Understand the workflow'], ['login', 'Log in'], ['run', 'Run it'], ['confirm', 'Confirm'], ['take', 'Take it with you']];
 document.getElementById('steps').innerHTML = steps.map(([k, t]) => `<div class="card step" id="s-${k}"><h3>${t}<span class="st">waiting</span></h3><div class="body"></div></div>`).join('');
 const set = (k, cls, st, html) => { const e = document.getElementById('s-' + k); e.className = 'card step ' + cls; e.querySelector('.st').textContent = st; if (html !== undefined) e.querySelector('.body').innerHTML = html; };
+function alertBox(m) { const n = document.getElementById('siteNote'); n.textContent = m; n.style.color = 'var(--color-bad)'; document.getElementById('go').disabled = false; }
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 const j = async (u, o) => { const r = await fetch(API + u, o); let b = {}; try { b = await r.json(); } catch {} return { code: r.status, b }; };
 
@@ -114,7 +123,16 @@ document.getElementById('f').onsubmit = async e => {
   e.preventDefault(); document.getElementById('go').disabled = true;
   const goal = document.getElementById('goal').value.trim();
   const gb = document.getElementById('goalBox'); if (goal) { gb.style.display = 'block'; gb.innerHTML = `<b>Your goal:</b> ${esc(goal)}`; }
-  const pdfs = [...pdfBox.querySelectorAll('input:checked')].map(i => i.value);
+  if (!urlIn.value.trim()) { alertBox('Add your tool\'s URL first.'); return; }
+  const uploads = [...document.getElementById('docs').files];
+  let pdfs = [...pdfBox.querySelectorAll('input:checked')].map(i => i.value), dirMode;
+  if (uploads.length) {
+    const names = [];
+    for (const f of uploads) { const r = await fetch(API + '/inputs?name=' + encodeURIComponent(f.name), { method: 'POST', body: f }); const b = await r.json().catch(() => ({}));
+      if (!r.ok) { alertBox(`Could not upload ${f.name}: ${b.error || r.status}`); return; } names.push(b.name); }
+    pdfs = names; dirMode = 'inputs';
+  } else if (PRELOAD && !pdfs.length) pdfs = [PRELOAD];
+  if (!pdfs.length) { alertBox('Attach at least one document (or pick a sample).'); return; }
   const video = document.getElementById('video').files[0], rec = document.getElementById('rec').files[0];
   // 1. Understand
   set('understand', 'run', 'working…');
@@ -139,7 +157,7 @@ document.getElementById('f').onsubmit = async e => {
   set('login', 'ok', 'logged in', `<p>Logged in to ${esc(s.b.site_url || SITE)}.</p>`);
   // 3. Run
   set('run', 'run', 'starting…', `<p>Processing ${pdfs.length} item(s): ${pdfs.map(esc).join(', ')}. Watch the browser window; each step is read back from OpenEMR after it is written.</p>`);
-  const body = { site: SITE, headed: true, async: true, pdfs }; if (SUFFIX) body.suffix = SUFFIX;
+  const body = { site: SITE, headed: true, async: true, pdfs }; if (dirMode) body.dir = dirMode; if (SUFFIX) body.suffix = SUFFIX;
   const st = await j('/intake', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
   if (st.code !== 202 && st.code !== 200) { set('run', 'bad', 'could not start', `<p>${esc(st.b.error || 'HTTP ' + st.code)}</p>`); document.getElementById('go').disabled = false; return; }
   const t0 = Date.now();
